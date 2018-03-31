@@ -106,7 +106,7 @@ public class Bot implements multipaint.Bot {
 
         for (int i = 0; i < ActionDirections.length; i++) {
             int[] nextPos = new int[]{currentPos[0] + ActionDirections[i][0], currentPos[1] + ActionDirections[i][1]};
-            points[0][i] = classifyWalk(nextPos, state.colors, state.player_positions);
+            points[0][i] = classifyWalk(ActionDirections[i], nextPos, state.colors, state.player_positions);
             points[1][i] = classifyShoot(ActionDirections[i], currentPos, state.colors);
         }
 
@@ -141,7 +141,7 @@ public class Bot implements multipaint.Bot {
     int classifyShoot(int[] actionDir, int[] currentPos, String[][] colors) {
         int points = 0;
 
-        int[] paintPos = new int[]{currentPos[0] + actionDir[0], currentPos[1] + actionDir[1]};
+        int[] paintPos = calculateNewPos(currentPos, actionDir);
         if (!isWithinLimits(paintPos, colors))
             return points;
 
@@ -161,12 +161,14 @@ public class Bot implements multipaint.Bot {
                 points += 1;
             else if (!isOwnColor(nextPos, colors))
                 points += 2;
+
+            nextPos = calculateNewPos(nextPos, actionDir);
         }
 
         if (surroundedIfShoot(paintPos, currentPos, colors))
             points -= 1;
 
-        System.err.println("Shoot aval: " + pointToString(actionDir) + " - points: " + points);
+        System.err.println("Shoot: " + dirToString(actionDir) + " (" + points + " pts)");
 
         return points;
     }
@@ -182,7 +184,7 @@ public class Bot implements multipaint.Bot {
         return surrounded;
     }
 
-    int classifyWalk(int[] nextPos, String[][] colors, Map<String, int[]> players) {
+    int classifyWalk(int[] dir, int[] nextPos, String[][] colors, Map<String, int[]> players) {
         int points = 0;
         if (!isWithinLimits(nextPos, colors))
             return points;
@@ -198,7 +200,7 @@ public class Bot implements multipaint.Bot {
         if (isOccupiedByOpponent(nextPos, players))
             points -= 2;
 
-        System.err.println("Walk aval: " + pointToString(nextPos) + " - points: " + points);
+        System.err.println("Walk : " + dirToString(dir) + " (" + points + " pts)");
 
         return points;
     }
@@ -223,12 +225,38 @@ public class Bot implements multipaint.Bot {
         return pos[0] < colors[0].length && pos[0] >= 0 && pos[1] < colors.length && pos[1] >= 0;
     }
 
+    String dirToString(int[] dir) {
+
+        if (posEquals(dir, ActionDirections[0]))
+            return "↖";
+        if (posEquals(dir, ActionDirections[1]))
+            return "←";
+        if (posEquals(dir, ActionDirections[2]))
+            return "↙";
+        if (posEquals(dir, ActionDirections[3]))
+            return "↑";
+        if (posEquals(dir, ActionDirections[4]))
+            return "↓";
+        if (posEquals(dir, ActionDirections[5]))
+            return "↗";
+        if (posEquals(dir, ActionDirections[6]))
+            return "→";
+        if (posEquals(dir, ActionDirections[7]))
+            return "↘";
+
+        return "error";
+    }
+
     String pointToString(int[] p) {
-        return "(" + p[0] + ", " + p[1] + ")";
+        return p[0] + ", " + p[1];
     }
 
     String actionToString(Action a) {
-        return a.type + " (" + a.direction[0] + ", " + a.direction[1] + ")";
+        return a.type + " " + dirToString(a.direction);
+    }
+
+    boolean posEquals(int[] a, int[] b) {
+        return a[0] == b[0] && a[1] == b[1];
     }
 
     public static void main(String[] args) {
