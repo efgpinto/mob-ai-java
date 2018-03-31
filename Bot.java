@@ -106,11 +106,18 @@ public class Bot implements multipaint.Bot {
 
         for (int i = 0; i < ActionDirections.length; i++) {
             int[] nextPos = new int[]{currentPos[0] + ActionDirections[i][0], currentPos[1] + ActionDirections[i][1]};
-            points[0][i] = classifyWalk(nextPos, state.colors);
+            points[0][i] = classifyWalk(nextPos, state.colors, state.player_positions);
             points[1][i] = classifyShoot(ActionDirections[i], currentPos, state.colors);
         }
 
         return points;
+    }
+
+    boolean isOccupiedByOpponent(int[] pos, Map<String, int[]> players) {
+        return players.entrySet().stream()
+                .filter(entry -> !entry.getKey().equals(playerId))
+                .filter(entry -> pos[0] == entry.getValue()[0] && pos[1] == entry.getValue()[1])
+                .count() > 0;
     }
 
     String findClosestOpponent(Map<String, int[]> players) {
@@ -159,7 +166,7 @@ public class Bot implements multipaint.Bot {
         if (surroundedIfShoot(paintPos, currentPos, colors))
             points -= 1;
 
-        System.err.println("aval: " + pointToString(actionDir) + " - points: " + points);
+        System.err.println("Shoot aval: " + pointToString(actionDir) + " - points: " + points);
 
         return points;
     }
@@ -175,7 +182,7 @@ public class Bot implements multipaint.Bot {
         return surrounded;
     }
 
-    int classifyWalk(int[] nextPos, String[][] colors) {
+    int classifyWalk(int[] nextPos, String[][] colors, Map<String, int[]> players) {
         int points = 0;
         if (!isWithinLimits(nextPos, colors))
             return points;
@@ -187,6 +194,11 @@ public class Bot implements multipaint.Bot {
 
         if (isAtBorder(nextPos, colors))
             points -= 1;
+
+        if (isOccupiedByOpponent(nextPos, players))
+            points -= 2;
+
+        System.err.println("Walk aval: " + pointToString(nextPos) + " - points: " + points);
 
         return points;
     }
