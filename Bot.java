@@ -12,7 +12,7 @@ public class Bot implements multipaint.Bot {
     static class Coord {
         int x, y;
 
-        Coord(int x, int y) {
+        Coord(int y, int x) {
             this.x = x;
             this.y = y;
         }
