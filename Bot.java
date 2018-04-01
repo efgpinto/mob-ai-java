@@ -9,10 +9,10 @@ public class Bot implements multipaint.Bot {
     private String playerId;
     Random r;
 
-    static class Coordinate {
+    static class Coord {
         int x, y;
 
-        Coordinate(int x, int y) {
+        Coord(int x, int y) {
             this.x = x;
             this.y = y;
         }
@@ -21,33 +21,33 @@ public class Bot implements multipaint.Bot {
         public boolean equals(Object that) {
             if (that == null)
                 return false;
-            if (! (that instanceof Coordinate))
+            if (!(that instanceof Coord))
                 return false;
 
-            Coordinate other = (Coordinate) that;
+            Coord other = (Coord) that;
             return other.x == this.x && other.y == this.y;
         }
 
         @Override
         public int hashCode() {
-            return Integer.hashCode(x+y);
+            return Integer.hashCode(x + y);
         }
 
         public int[] toArray() {
-            return new int[] {x, y};
+            return new int[]{x, y};
         }
     }
 
-    static Coordinate N = new Coordinate(0, -1);
-    static Coordinate NW = new Coordinate(-1, -1);
-    static Coordinate NE = new Coordinate(1, -1);
-    static Coordinate S = new Coordinate(0, 1);
-    static Coordinate SE = new Coordinate(1, 1);
-    static Coordinate SW = new Coordinate(-1, 1);
-    static Coordinate E = new Coordinate(1, 0);
-    static Coordinate W = new Coordinate(-1, 0);
+    static Coord N = new Coord(0, -1);
+    static Coord NW = new Coord(-1, -1);
+    static Coord NE = new Coord(1, -1);
+    static Coord S = new Coord(0, 1);
+    static Coord SE = new Coord(1, 1);
+    static Coord SW = new Coord(-1, 1);
+    static Coord E = new Coord(1, 0);
+    static Coord W = new Coord(-1, 0);
 
-    public static Coordinate[] actions = new Coordinate[]{
+    public static Coord[] actions = new Coord[]{
             NW, N, NE, W, E, SW, S, SE
     };
 
@@ -65,7 +65,7 @@ public class Bot implements multipaint.Bot {
 
     public Action nextMove(Board state) {
 
-        System.err.println("\n\nTurns left:" + state.turns_left);
+        System.err.println("\n\n#############################\nTurns left:" + state.turns_left);
         Action a = new Action();
 
         int[] currentPos = state.player_positions.get(playerId);
@@ -113,32 +113,31 @@ public class Bot implements multipaint.Bot {
         return points;
     }
 
-    boolean isOccupiedByOpponent(int[] pos, Map<String, int[]> players) {
+    private boolean isOccupiedByOpponent(int[] pos, Map<String, int[]> players) {
         return players.entrySet().stream()
                 .filter(entry -> !entry.getKey().equals(playerId))
                 .filter(entry -> pos[0] == entry.getValue()[0] && pos[1] == entry.getValue()[1])
                 .count() > 0;
     }
 
-    String findClosestOpponent(Map<String, int[]> players) {
+    private String findClosestOpponent(Map<String, int[]> players) {
         return players.entrySet().stream()
-            .filter(entry -> !entry.getKey().equals(playerId))
-            .map(entry -> new AbstractMap.SimpleEntry<>(entry.getKey(), distance(entry.getValue(), players.get(playerId))))
-            .max(Map.Entry.comparingByValue())
-            .get()
-            .getKey();
+                .filter(entry -> !entry.getKey().equals(playerId))
+                .map(entry -> new AbstractMap.SimpleEntry<>(entry.getKey(), distance(entry.getValue(), players.get(playerId))))
+                .max(Map.Entry.comparingByValue())
+                .get()
+                .getKey();
     }
 
-    int[] moveCloserToOpponent(String opponentId, int[] opponentPos, int[] currentPos) {
+    private int[] moveCloserToOpponent(String opponentId, int[] opponentPos, int[] currentPos) {
         return Stream.of(ActionDirections)
-                .map(c -> new AbstractMap.SimpleEntry<>(new Coordinate(c[0], c[1]), distance(calculateNewPos(currentPos, c), opponentPos)))
+                .map(c -> new AbstractMap.SimpleEntry<>(new int[]{c[0], c[1]}, distance(calculateNewPos(currentPos, c), opponentPos)))
                 .min(Map.Entry.comparingByValue())
                 .get()
-                .getKey()
-                .toArray();
+                .getKey();
     }
 
-    int classifyShoot(int[] actionDir, int[] currentPos, String[][] colors) {
+    private int classifyShoot(int[] actionDir, int[] currentPos, String[][] colors) {
         int points = 0;
 
         int[] paintPos = calculateNewPos(currentPos, actionDir);
@@ -173,7 +172,7 @@ public class Bot implements multipaint.Bot {
         return points;
     }
 
-    boolean surroundedIfShoot(int[] shootPos, int[] currPos, String[][] colors) {
+    private boolean surroundedIfShoot(int[] shootPos, int[] currPos, String[][] colors) {
         boolean surrounded = true;
         for (int i = 0; i < ActionDirections.length; i++) {
             int[] pos = new int[]{currPos[0] + ActionDirections[i][0], currPos[1] + ActionDirections[i][1]};
@@ -184,7 +183,7 @@ public class Bot implements multipaint.Bot {
         return surrounded;
     }
 
-    int classifyWalk(int[] dir, int[] nextPos, String[][] colors, Map<String, int[]> players) {
+    private int classifyWalk(int[] dir, int[] nextPos, String[][] colors, Map<String, int[]> players) {
         int points = 0;
         if (!isWithinLimits(nextPos, colors))
             return points;
@@ -205,27 +204,27 @@ public class Bot implements multipaint.Bot {
         return points;
     }
 
-    int[] calculateNewPos(int[] current, int[] dir) {
+    private int[] calculateNewPos(int[] current, int[] dir) {
         return new int[]{current[0] + dir[0], current[1] + dir[1]};
     }
 
-    double distance(int[] a, int[] b) {
+    private double distance(int[] a, int[] b) {
         return Math.hypot(a[0] - b[0], a[1] - b[1]);
     }
 
-    boolean isOwnColor(int[] pos, String[][] colors) {
+    private boolean isOwnColor(int[] pos, String[][] colors) {
         return isWithinLimits(pos, colors) && playerId.equals(colors[pos[0]][pos[1]]);
     }
 
-    boolean isAtBorder(int[] pos, String[][] colors) {
+    private boolean isAtBorder(int[] pos, String[][] colors) {
         return pos[0] == 0 || pos[0] == colors[0].length - 1 || pos[1] == 0 || pos[1] == colors.length - 1;
     }
 
-    boolean isWithinLimits(int[] pos, String[][] colors) {
+    private boolean isWithinLimits(int[] pos, String[][] colors) {
         return pos[0] < colors[0].length && pos[0] >= 0 && pos[1] < colors.length && pos[1] >= 0;
     }
 
-    String dirToString(int[] dir) {
+    private String dirToString(int[] dir) {
 
         if (posEquals(dir, ActionDirections[0]))
             return "↖";
@@ -247,19 +246,20 @@ public class Bot implements multipaint.Bot {
         return "error";
     }
 
-    String pointToString(int[] p) {
+    private String pointToString(int[] p) {
         return p[0] + ", " + p[1];
     }
 
-    String actionToString(Action a) {
+    private String actionToString(Action a) {
         return a.type + " " + dirToString(a.direction);
     }
 
-    boolean posEquals(int[] a, int[] b) {
+    private boolean posEquals(int[] a, int[] b) {
         return a[0] == b[0] && a[1] == b[1];
     }
 
     public static void main(String[] args) {
         Runner.run(new Bot());
     }
+
 }
