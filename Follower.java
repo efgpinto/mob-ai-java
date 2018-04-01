@@ -25,15 +25,12 @@ public class Follower implements multipaint.Bot {
 
     public Action nextMove(Board state) {
 
-        System.err.println("\n\n#############################\nTurns left:" + state.turns_left);
         Action a = new Action();
         int[] currentPos = state.player_positions.get(playerId);
 
         a.type = ActionTypes[1];
         String closestOpponent = findClosestOpponent(state.player_positions);
         a.direction = moveCloserToOpponent(state.player_positions.get(closestOpponent), currentPos);
-
-        System.err.println("Play: " + actionToString(a));
 
         return a;
     }
@@ -61,36 +58,6 @@ public class Follower implements multipaint.Bot {
 
     private double distance(int[] a, int[] b) {
         return Math.hypot(a[0] - b[0], a[1] - b[1]);
-    }
-
-    private String dirToString(int[] dir) {
-
-        if (posEquals(dir, ActionDirections[0]))
-            return "↖";
-        if (posEquals(dir, ActionDirections[1]))
-            return "←";
-        if (posEquals(dir, ActionDirections[2]))
-            return "↙";
-        if (posEquals(dir, ActionDirections[3]))
-            return "↑";
-        if (posEquals(dir, ActionDirections[4]))
-            return "↓";
-        if (posEquals(dir, ActionDirections[5]))
-            return "↗";
-        if (posEquals(dir, ActionDirections[6]))
-            return "→";
-        if (posEquals(dir, ActionDirections[7]))
-            return "↘";
-
-        return "error";
-    }
-
-    private String actionToString(Action a) {
-        return a.type + " " + dirToString(a.direction);
-    }
-
-    private boolean posEquals(int[] a, int[] b) {
-        return a[0] == b[0] && a[1] == b[1];
     }
 
     public static void main(String[] args) {

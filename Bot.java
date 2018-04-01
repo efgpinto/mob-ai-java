@@ -107,7 +107,7 @@ public class Bot implements multipaint.Bot {
         for (int i = 0; i < ActionDirections.length; i++) {
             int[] nextPos = new int[]{currentPos[0] + ActionDirections[i][0], currentPos[1] + ActionDirections[i][1]};
             points[0][i] = classifyWalk(ActionDirections[i], nextPos, state.colors, state.player_positions);
-            points[1][i] = classifyShoot(ActionDirections[i], currentPos, state.colors);
+            points[1][i] = classifyShoot(ActionDirections[i], currentPos, state.colors, state.player_positions);
         }
 
         return points;
@@ -137,7 +137,7 @@ public class Bot implements multipaint.Bot {
                 .getKey();
     }
 
-    private int classifyShoot(int[] actionDir, int[] currentPos, String[][] colors) {
+    private int classifyShoot(int[] actionDir, int[] currentPos, String[][] colors, Map<String, int[]> opponents) {
         int points = 0;
 
         int[] paintPos = calculateNewPos(currentPos, actionDir);
@@ -154,7 +154,7 @@ public class Bot implements multipaint.Bot {
 
         // point forward shoot
         for (int[] nextPos = paintPos.clone();
-             isWithinLimits(nextPos, colors) && paintedOwn > 0;
+             isWithinLimits(nextPos, colors) && paintedOwn > 0 && !isOccupiedByOpponent(nextPos, opponents);
              paintedOwn--) {
             if (null == colors[nextPos[0]][nextPos[1]])
                 points += 1;
