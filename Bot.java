@@ -1,55 +1,19 @@
 import java.util.*;
 import java.util.stream.Stream;
 
+import javafx.util.Pair;
 import multipaint.Action;
 import multipaint.Board;
 import multipaint.Runner;
 
 public class Bot implements multipaint.Bot {
     private String playerId;
-    Random r;
+    private int height, width;
+    private int[][] history;
+    private List<Pair<Integer, Integer>> positionHistory;
+    private int turns = -1;
+    private int currentTurn = -1;
 
-    static class Coord {
-        int x, y;
-
-        Coord(int y, int x) {
-            this.x = x;
-            this.y = y;
-        }
-
-        @Override
-        public boolean equals(Object that) {
-            if (that == null)
-                return false;
-            if (!(that instanceof Coord))
-                return false;
-
-            Coord other = (Coord) that;
-            return other.x == this.x && other.y == this.y;
-        }
-
-        @Override
-        public int hashCode() {
-            return Integer.hashCode(x + y);
-        }
-
-        public int[] toArray() {
-            return new int[]{x, y};
-        }
-    }
-
-    static Coord N = new Coord(0, -1);
-    static Coord NW = new Coord(-1, -1);
-    static Coord NE = new Coord(1, -1);
-    static Coord S = new Coord(0, 1);
-    static Coord SE = new Coord(1, 1);
-    static Coord SW = new Coord(-1, 1);
-    static Coord E = new Coord(1, 0);
-    static Coord W = new Coord(-1, 0);
-
-    public static Coord[] actions = new Coord[]{
-            NW, N, NE, W, E, SW, S, SE
-    };
 
     static String[] ActionTypes = new String[]{"shoot", "walk"};
     static int[][] ActionDirections = new int[][]{
@@ -60,10 +24,25 @@ public class Bot implements multipaint.Bot {
 
     public void setPlayerId(String playerId) {
         this.playerId = playerId;
-        this.r = new Random();
     }
 
     public Action nextMove(Board state) {
+        if (turns == -1)
+            turns = state.turns_left;
+
+        if (history == null)
+            history = new int[state.height][state.width];
+
+        if (positionHistory == null) {
+            positionHistory = new ArrayList<>();
+            int[] currentPos = state.player_positions.get(playerId);
+            positionHistory.add(new Pair<>(currentPos[0], currentPos[1]));
+        }
+
+        height = state.height;
+        width = state.width;
+
+        currentTurn = turns - state.turns_left;
 
         System.err.println("\n\n#############################\nTurns left:" + state.turns_left);
         Action a = new Action();
@@ -224,7 +203,7 @@ public class Bot implements multipaint.Bot {
     }
 
     private boolean isEmpty(int[] pos, String[][] colors) {
-        return null == colors[pos[0]][pos[1]];
+        return isWithinLimits(pos, colors) && null == colors[pos[0]][pos[1]];
     }
 
     private boolean isOwnColor(int[] pos, String[][] colors) {
@@ -232,11 +211,11 @@ public class Bot implements multipaint.Bot {
     }
 
     private boolean isAtBorder(int[] pos, String[][] colors) {
-        return pos[0] == 0 || pos[0] == colors[0].length - 1 || pos[1] == 0 || pos[1] == colors.length - 1;
+        return pos[0] == 0 || pos[0] == height || pos[1] == 0 || pos[1] == width;
     }
 
     private boolean isWithinLimits(int[] pos, String[][] colors) {
-        return pos[0] < colors[0].length && pos[0] >= 0 && pos[1] < colors.length && pos[1] >= 0;
+        return pos[0] < height && pos[0] >= 0 && pos[1] < width && pos[1] >= 0;
     }
 
     private String dirToString(int[] dir) {
@@ -277,4 +256,8 @@ public class Bot implements multipaint.Bot {
         Runner.run(new Bot());
     }
 
+
+    // TODO: avoid getting stuck in one position
+    // TODO: identify profiles of opponents
+    // TODO: change points calculation with depth and number of plays
 }
