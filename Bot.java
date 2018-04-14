@@ -1,7 +1,6 @@
 import java.util.*;
 import java.util.stream.Stream;
 
-import javafx.util.Pair;
 import multipaint.Action;
 import multipaint.Board;
 import multipaint.Runner;
@@ -9,45 +8,96 @@ import multipaint.Runner;
 public class Bot implements multipaint.Bot {
     private String playerId;
     private int height, width;
-    private int[][] history;
-    private List<Pair<Integer, Integer>> positionHistory;
+    private String[] typeHistory;
+    private int[][] directionHistory;
+    private int[][] positionHistory;
     private int turns = -1;
-    private int currentTurn = -1;
+    private int currentTurn = 0;
+    private boolean isStuck;
+    private boolean stay = false;
+    private int shootingFactor = 1;
+    private Map<String, int[]> paintedHistory;
 
 
     static String[] ActionTypes = new String[]{"shoot", "walk"};
     static int[][] ActionDirections = new int[][]{
             {-1, -1}, {0, -1}, {1, -1},
-            {-1, 0}, {1, 0},
-            {-1, 1}, {0, 1}, {1, 1},
+            {-1, 0},           {1, 0},
+            {-1, 1},  {0, 1},  {1, 1},
     };
 
     public void setPlayerId(String playerId) {
         this.playerId = playerId;
     }
 
-    public Action nextMove(Board state) {
+    private void init(Board state) {
         if (turns == -1)
             turns = state.turns_left;
 
-        if (history == null)
-            history = new int[state.height][state.width];
-
         if (positionHistory == null) {
-            positionHistory = new ArrayList<>();
-            int[] currentPos = state.player_positions.get(playerId);
-            positionHistory.add(new Pair<>(currentPos[0], currentPos[1]));
+            positionHistory = new int[turns][2];
+            directionHistory = new int[turns][2];
+            typeHistory = new String[turns];
+            paintedHistory = new HashMap<>();
+            state.player_positions.entrySet().stream().forEach(
+                    entry -> paintedHistory.put(entry.getKey(), new int[turns]));
+            paintedHistory.put(null, new int[turns]);
         }
 
         height = state.height;
         width = state.width;
+    }
 
-        currentTurn = turns - state.turns_left;
+    boolean amIWinning() {
+        return paintedHistory.entrySet().stream()
+                .filter(entry -> entry.getKey() != null)
+                .map(entry -> new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue()[currentTurn]))
+                .max(Map.Entry.comparingByValue())
+                .get()
+                .getKey()
+                .equals(playerId);
+    }
 
-        System.err.println("\n\n#############################\nTurns left:" + state.turns_left);
-        Action a = new Action();
+    private void updatePaintedHistory(Board state) {
+        Map<String, Integer> points = new HashMap<>();
+        for (int i=0; i < height; i++) {
+            for (int j=0; j < width; j++) {
+                String color = state.colors[i][j];
+                points.put(color, 1 + points.getOrDefault(color, 0));
+            }
+        }
+
+        points.entrySet().stream().forEach(
+                entry -> {
+                    int[] hist = paintedHistory.get(entry.getKey());
+                    hist[currentTurn] = entry.getValue();
+                    paintedHistory.put(entry.getKey(), hist);
+                }
+        );
+    }
+
+    public Action nextMove(Board state) {
+
+        init(state);
 
         int[] currentPos = state.player_positions.get(playerId);
+        positionHistory[currentTurn] = currentPos;
+        updatePaintedHistory(state);
+
+        System.err.println("\n\n##############\nTurns left:" + state.turns_left + " -- painted squares: " + paintedHistory.get(playerId)[currentTurn] + " -- free squares " + paintedHistory.get(null)[currentTurn]);
+
+        if (currentTurn > 2) {
+            isStuck = typeHistory[currentTurn-1].equals(typeHistory[currentTurn-2]) &&
+                    posEquals(directionHistory[currentTurn-1], directionHistory[currentTurn-2]) &&
+                    posEquals(positionHistory[currentTurn-1], positionHistory[currentTurn-2]);
+
+            if (isStuck && amIWinning()) {
+                shootingFactor = 2;
+                System.err.println("$$$$$$$$$$$$$$ STUCK & WINNING!!!!");
+            }
+        }
+
+        Action a = new Action();
 
         int[][] points = classifyPosition(state, currentPos);
         int[] walkPoints = points[0];
@@ -69,7 +119,7 @@ public class Bot implements multipaint.Bot {
             a.type = ActionTypes[0];
         }
 
-        if (walkPoints[indexes[7]] <= 0 && shootPoints[indexesShoot[7]] <= 0) {
+        if (walkPoints[indexes[7]] <= 0 && shootPoints[indexesShoot[7]] <= 0 && !stay) {
             a.type = ActionTypes[1];
             String closestOpponent = findClosestOpponent(state.player_positions);
             a.direction = moveCloserToOpponent(closestOpponent, state.player_positions.get(closestOpponent), currentPos);
@@ -78,6 +128,9 @@ public class Bot implements multipaint.Bot {
         }
 
         System.err.println("Play: " + actionToString(a));
+        typeHistory[currentTurn] = a.type;
+        directionHistory[currentTurn] = a.direction;
+        currentTurn++;
         return a;
     }
 
@@ -93,9 +146,9 @@ public class Bot implements multipaint.Bot {
         return points;
     }
 
-    private boolean isOccupiedByOpponent(int[] pos, Map<String, int[]> players) {
+    private boolean isOccupiedByOpponent(int[] pos, Map<String, int[]> players, String player) {
         return players.entrySet().stream()
-                .filter(entry -> !entry.getKey().equals(playerId))
+                .filter(entry -> !entry.getKey().equals(player))
                 .filter(entry -> pos[0] == entry.getValue()[0] && pos[1] == entry.getValue()[1])
                 .count() > 0;
     }
@@ -111,43 +164,53 @@ public class Bot implements multipaint.Bot {
 
     private int[] moveCloserToOpponent(String opponentId, int[] opponentPos, int[] currentPos) {
         return Stream.of(ActionDirections)
-                .map(c -> new AbstractMap.SimpleEntry<>(new int[]{c[0], c[1]}, distance(calculateNewPos(currentPos, c), opponentPos)))
+                .map(c -> new AbstractMap.SimpleEntry<>(new int[]{c[0], c[1]}, distance(goForward(currentPos, c), opponentPos)))
                 .min(Map.Entry.comparingByValue())
                 .get()
                 .getKey();
     }
 
     private int classifyShoot(int[] actionDir, int[] currentPos, String[][] colors, Map<String, int[]> players) {
+        if (isStuck && posEquals(currentPos, positionHistory[currentTurn-1]) &&
+                posEquals(actionDir, directionHistory[currentTurn-1]))
+            return -5;
+
         int points = 0;
 
-        int[] paintPos = calculateNewPos(currentPos, actionDir);
+        int[] paintPos = goForward(currentPos, actionDir);
         if (!isWithinLimits(paintPos, colors))
             return points;
 
+        points += evalShooting(actionDir, currentPos, colors, players, playerId);
+
+        //if (surroundedIfShoot(paintPos, currentPos, colors))
+            //points -= 1;
+
+        return points * shootingFactor;
+    }
+
+    private int evalShooting(int[] actionDir, int[] currentPos, String[][] colors, Map<String, int[]> players, String player) {
+        int points = 0;
+
         // check opposite direction points
         int paintedOwn = 0;
-        for (int[] nextPos = new int[]{currentPos[0] - actionDir[0], currentPos[1] - actionDir[1]};
-             isWithinLimits(nextPos, colors) && playerId.equals(colors[nextPos[0]][nextPos[1]]);
-             nextPos = new int[]{nextPos[0] - actionDir[0], nextPos[1] - actionDir[1]}) {
+        for (int[] nextPos = goBack(currentPos, actionDir);
+             isWithinLimits(nextPos, colors) && player.equals(colors[nextPos[0]][nextPos[1]]);
+             nextPos = goBack(nextPos, actionDir)) {
             paintedOwn++;
         }
 
         // point forward shoot
-        for (int[] nextPos = paintPos.clone();
-             isWithinLimits(nextPos, colors) && paintedOwn > 0 && !isOccupiedByOpponent(nextPos, players);
-             paintedOwn--) {
-            if (isEmpty(nextPos, colors))
+        int[] nextPos = goForward(currentPos, actionDir);
+        do {
+            if (isUnpainted(nextPos, colors))
                 points += 1;
             else if (!isOwnColor(nextPos, colors))
                 points += 2;
-            else
-                points -= 1;
 
-            nextPos = calculateNewPos(nextPos, actionDir);
-        }
-
-        if (surroundedIfShoot(paintPos, currentPos, colors))
-            points -= 1;
+            nextPos = goForward(nextPos, actionDir);
+            paintedOwn--;
+        } while (isWithinLimits(nextPos, colors) && paintedOwn > 0);// && !isOccupiedByOpponent(nextPos, players, playerId));
 
         return points;
     }
@@ -164,22 +227,28 @@ public class Bot implements multipaint.Bot {
     }
 
     private int classifyWalk(int[] dir, int[] nextPos, String[][] colors, Map<String, int[]> players) {
+        int[] currentPos = new int[]{nextPos[0] - dir[0], nextPos[1] - dir[1]};
+        if (isStuck && posEquals(currentPos, positionHistory[currentTurn-1]) &&
+                posEquals(dir, directionHistory[currentTurn-1])) {
+            return -5;
+        }
+
         int points = 0;
 
         if (!isWithinLimits(nextPos, colors))
             return points;
 
-        if (isEmpty(nextPos, colors))
+        if (isUnpainted(nextPos, colors))
             points += 1;
         else if (!isOwnColor(nextPos, colors))
             points += 2;
         else
             points -= 2;
 
-        /*if (isAtBorder(nextPos, colors))
-            points -= 1;*/
+        if (isAtBorder(nextPos, colors))
+            points -= 1;
 
-        if (isOccupiedByOpponent(nextPos, players))
+        if (isOccupiedByOpponent(nextPos, players, playerId))
             points -= 2;
 
         points += classifyOptions(nextPos, colors, players) / 2;
@@ -194,15 +263,19 @@ public class Bot implements multipaint.Bot {
                 .orElse(0);
     }
 
-    private int[] calculateNewPos(int[] current, int[] dir) {
+    private int[] goForward(int[] current, int[] dir) {
         return new int[]{current[0] + dir[0], current[1] + dir[1]};
+    }
+
+    private int[] goBack(int[] current, int[] dir) {
+        return new int[]{current[0] - dir[0], current[1] - dir[1]};
     }
 
     private double distance(int[] a, int[] b) {
         return Math.hypot(a[0] - b[0], a[1] - b[1]);
     }
 
-    private boolean isEmpty(int[] pos, String[][] colors) {
+    private boolean isUnpainted(int[] pos, String[][] colors) {
         return isWithinLimits(pos, colors) && null == colors[pos[0]][pos[1]];
     }
 
@@ -211,7 +284,7 @@ public class Bot implements multipaint.Bot {
     }
 
     private boolean isAtBorder(int[] pos, String[][] colors) {
-        return pos[0] == 0 || pos[0] == height || pos[1] == 0 || pos[1] == width;
+        return pos[0] == 0 || pos[0] == height-1 || pos[1] == 0 || pos[1] == width-1;
     }
 
     private boolean isWithinLimits(int[] pos, String[][] colors) {
@@ -257,7 +330,6 @@ public class Bot implements multipaint.Bot {
     }
 
 
-    // TODO: avoid getting stuck in one position
     // TODO: identify profiles of opponents
     // TODO: change points calculation with depth and number of plays
 }
